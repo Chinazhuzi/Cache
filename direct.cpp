@@ -23,17 +23,7 @@ public:
         tag = new_tag;
         data = new_data;
     }
-    /*int search(int address)
-    {
-        int new_tag=address/16;//index=2 size=2 tag=60?
-        for (int i = 0; i < 4; i++) {
-		if (this->tag == tag&&this->valid == 1) {
-			return i;
-		}
-        return -1;
-	}
-	return -1;
-    }*/
+
 };
 
 int search(vector<Cache>& cacheTable, int address) {
@@ -78,22 +68,7 @@ void move_into_cache(int address,Cache c)
     c.valid=1;
 }
 
-void processLine(const std::string& line) {
-    std::istringstream iss(line);
-    std::string part;
-    while (iss >> part) {
-        if (part == "address") {
-            iss >> part; // Skip "address"
-            int address;
-            if (iss >> hex >> address) {
-                search(cacheTable,address)
-            } else {
-                std::cerr << "Failed to read address from line: " << line << std::endl;
-            }
-            break;
-        }
-    }
-}
+
 int main()
 {
 vector<Cache> cacheTable;
@@ -132,6 +107,6 @@ cacheTable.push_back(c4);
         return 1;
     }
 
-
 return 0;
 }
+
