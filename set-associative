@@ -1,0 +1,190 @@
+#include<iostream>
+#include <cmath>
+#include<list>
+#include <cstdlib>
+#include <ctime>
+
+using namespace std;
+
+#define addsize 20  //地址大小
+#define blocksize 3  //每块有8byte也就是3位
+#define num 3  //使用三路组相联
+//#define indexsize 4  //index取4位，也就是cache一共有16块，则tag为7位
+//#define tagsize (addsize-blocksize-indexsize)
+//direct mapped
+class Cache_node 
+{
+public:
+	bool valid;
+	int tag;
+	int data;
+	Cache_node() 
+	{
+		valid = false;
+		tag = -1;
+		data = -1;
+	}
+};
+
+class Cache_set
+{
+private:
+	int node_num;  //几路组相连
+	Cache_node *set;
+	list<int> lru;  //单独创建lru算法对应队列
+public:
+	Cache_set()
+	{
+		for(int i=0;i<num;i++)
+			lru.push_back(i);
+		node_num=num;
+		set=new Cache_node[num];
+	}
+	~Cache_set()
+	{
+		delete[] set;
+	}
+	void update_lru(int i)  //完全版的lru更新需要使用hash表以及双向链表，这里就使用比较简单粗暴的方式，函数将元素i放到表的末尾
+	{
+		if(lru.back()==i)  //本身就在最后，就不需要更改位置了
+			return;
+		else
+		{
+			list<int>::iterator tmp=lru.begin();//遍历找到i的位置
+			while(tmp!=lru.end())
+			{
+				if(*tmp==i)
+				{
+					lru.erase(tmp);
+					lru.push_back(i);
+					break;
+				}
+				tmp++;
+			}
+		}
+	}
+	bool search_lru(int add_tag,int add_block)  //访存操作，传入tag与偏移位，返回是否成功访存，失效为False
+	{
+		int tag_fail=-1;
+		/*for(int i=0;i<node_num;i++)
+			cout<<set[i].valid<<" "<<set[i].tag<<"	";
+		cout<<endl;*/
+		for(int i=0;i<node_num;i++)
+		{
+			if(set[i].valid==true&&set[i].tag==add_tag)  //命中
+			{
+				update_lru(i);
+				return true;
+			}
+			else if(set[i].valid==false)  //标记一下可以插入的位置
+			{
+				tag_fail=i;
+			}
+		}
+		if(tag_fail>=0)
+		{
+			update_lru(tag_fail);
+			set[tag_fail].valid=true;
+			set[tag_fail].tag=add_tag;
+			set[tag_fail].data=111;  //这里无法访存故直接插入111
+		}
+		else  //即所有框已经满了
+		{
+			int old=lru.front();
+			set[old].tag=add_tag;
+			set[old].data=111;
+			update_lru(old);
+		}
+		return false;
+	}
+	bool search_random(int add_tag,int add_block)  //访存操作，传入tag与偏移位，返回是否成功访存，失效为False
+	{
+		int tag_fail=-1;
+		for(int i=0;i<node_num;i++)
+			cout<<set[i].valid<<" "<<set[i].tag<<"	";
+		cout<<endl;
+		for(int i=0;i<node_num;i++)
+		{
+			if(set[i].valid==true&&set[i].tag==add_tag)  //命中
+				return true;
+			else if(set[i].valid==false)  //标记一下可以插入的位置
+				tag_fail=i;
+		}
+		if(tag_fail>=0)
+		{
+			set[tag_fail].valid=true;
+			set[tag_fail].tag=add_tag;
+			set[tag_fail].data=111;  //这里无法访存故直接插入111
+		}
+		else  //即所有框已经满了
+		{
+			srand(time(NULL));
+			int old=rand()%3;  //生成3以内的随机数
+			set[old].tag=add_tag;
+			set[old].data=111;
+			update_lru(old);
+		}
+		return false;
+	}
+};
+
+class Cache_ass  //三路组相连
+{
+private:
+	int index_size;  //记录cache索引位数
+	int invalid_num;  //失效次数
+	Cache_set *cache;  //cache本体
+	int get_block; //下面两个为了方便获取各项的二进制取值，右移并与之异或即可
+	int get_index;
+public:
+	Cache_ass()
+	{
+		index_size=0;
+		cache=NULL;
+		invalid_num=0;
+	}
+	Cache_ass(int bit_size)  //注意这个bit_size就是index位数，也就是块数=2^bit_size
+	{
+		invalid_num=0;
+		index_size=bit_size;
+		const int tmp=int(pow(2,double(bit_size)));
+		cache=new Cache_set[tmp];  //生成一个数组且默认初始化
+		//int get_tag=(1<<addsize)-(1<<(blocksize+bit_size)); 
+		get_block=(1<<blocksize)-1;
+		get_index=(1<<bit_size)-1;
+	}
+	~Cache_ass()
+	{
+		delete[] cache;
+	}
+	void search(int address)   //访存操作
+	{
+		//cout<<(address>>blocksize)<<get_index<<endl;
+		int _index=(address>>blocksize)&get_index;
+		int _tag=address>>(index_size+blocksize);
+		int _block=address&get_block;
+		//cout<<_index<<endl;
+		bool search_res=cache[_index].search_random(_tag,_block);
+		if(search_res==false)
+		{
+			cout<<"address "<<address<<"has missed"<<endl;
+			invalid_num++;
+		}
+		else
+			cout<<"address "<<address<<"has hitted"<<endl;
+	}
+	void output()
+	{
+		cout<<"Cache has failed a total of "<<invalid_num<<" times"<<endl;
+	}
+};
+
+int main()
+{
+	//c Cashe_ass(4);
+	Cache_ass* c=new Cache_ass(4);  //即16块的3路组相联cache
+	int address_test[8]={0x12408,0x12410,0x12490,0x12510,0x12411,0x12590,0x12590,0x12420};
+	for(int i=0;i<8;i++)
+		c->search(address_test[i]);
+	c->output();
+}
